@@ -11,39 +11,57 @@
 #   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 
 import sys
+import time
 import argparse
-from zenoh import Zenoh, Selector, Path, Workspace, Encoding, Value
+import zenoh
+from zenoh import Zenoh
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='z_get',
-    description='Issues a query for a selector specified by the command-line')
-
-parser.add_argument('--selector', '-s', dest='selector',
-                    default='/zenoh/examples/**',
+    description='zenoh get example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The selector to be used for issuing the query')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
-
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--selector', '-s', dest='selector',
+                    default='/demo/example/**',
+                    type=str,
+                    help='The selection of resources to get.')
 
 args = parser.parse_args()
+conf = { "mode": args.mode }
+if args.peer is not None:
+    conf["peer"] = ",".join(args.peer)
+if args.listener is not None:
+    conf["listener"] = ",".join(args.listener)
 selector = args.selector
-locator = args.locator
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
-print('Login to Zenoh...')
-z = Zenoh.login(locator)
-w = z.workspace()
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-print('Get from {}'.format(selector))
-for data in w.get(selector):
-    print('  {} : {} - {}'.format(data.path, data.value, data.value.encoding))
+# initiate logging
+zenoh.init_logger()
 
+print("Openning session...")
+zenoh = Zenoh(conf)
 
-z.logout()
+print("New workspace...")
+workspace = zenoh.workspace()
+
+print("Get Data from '{}'...".format(selector))
+for data in workspace.get(selector):
+    print('  {} : {}  (encoding: {} , timestamp: {})'.format(
+        data.path, data.value.get_content(), data.value.encoding_descr(), data.timestamp))
+
+zenoh.close()

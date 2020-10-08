@@ -11,65 +11,67 @@
 #   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 
 import sys
+import time
 import argparse
-from zenoh import Zenoh, Selector, Path, Workspace
-from zenoh import Change, ChangeKind, Encoding, Value
+import zenoh
+from zenoh import Zenoh
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='z_sub',
-    description='An example illustrating zenoh subscribers')
-parser.add_argument('--selector', '-s', dest='selector',
-                    default='/zenoh/examples/**',
+    description='zenoh sub example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The selector specifying the subscription')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
-
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--selector', '-s', dest='selector',
+                    default='/demo/example/**',
+                    type=str,
+                    help='The selection of resources to subscribe.')
 
 args = parser.parse_args()
-
-locator = args.locator
+conf = { "mode": args.mode }
+if args.peer is not None:
+    conf["peer"] = ",".join(args.peer)
+if args.listener is not None:
+    conf["listener"] = ",".join(args.listener)
 selector = args.selector
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
 
-print('Login to zenoh...')
-z = Zenoh.login(locator)
-
-w = z.workspace()
-
-
-def listener(changes):
-    for change in changes:
-        v = change.get_value()
-        if change.get_kind() == ChangeKind.PUT:
-            print('>> [Subscription listener] Received PUT on "{}": {} [{}] {}'
-                  .format(change.get_path(), v.get_value(),
-                          v.get_encoding(), type(v.get_value())))
-        elif change.get_kind() == ChangeKind.UPDATE:
-            print('>> [Subscription listener] Received UPDATE on "{}": {} [{}]'
-                  .format(change.get_path(), v.get_value(), v.get_encoding()))
-        elif change.get_kind() == ChangeKind.REMOVE:
-            print('>> [Subscription listener] Received REMOVE on "{}"'
-                  .format(change.get_path()))
-        else:
-            print('>> [Subscription listener] Received kind:"{}" on "{}"'
-                  .format(change.get_kind(), change.get_path()))
+def listener(change):
+    print(">> [Subscription listener] received {:?} for {} : {} with timestamp {}"
+          .format(change.kind, change.path, '' if change.value is None else change.value.get_content(), change.timestamp))
 
 
-print('Subscribe on {}'.format(selector))
-subid = w.subscribe(selector, listener)
+# initiate logging
+zenoh.init_logger()
 
-print('Enter \'q\' to quit...')
-while sys.stdin.read(1) != 'q':
-    pass
+print("Openning session...")
+zenoh = Zenoh(conf)
 
-w.unsubscribe(subid)
-z.logout()
+print("New workspace...")
+workspace = zenoh.workspace()
+
+print("Subscribe to '{}'...".format(selector))
+sub = workspace.subscribe(selector, listener)
+
+print("Press q to stop...")
+c = '\0'
+while c != 'q':
+    c = sys.stdin.read(1)
+
+sub.close()
+zenoh.close()

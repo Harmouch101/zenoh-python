@@ -14,61 +14,89 @@ import sys
 import time
 import datetime
 import argparse
-from zenoh.net import Session, SubscriberMode
-
+import zenoh
+from zenoh.net import config, SubInfo, Reliability, SubMode
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
-    prog='zb_sub_thr',
-    description='The zenoh-net throughput subscriber')
-
-parser.add_argument('--path', '-p', dest='path',
-                    default='/zenoh/examples/throughput/data',
+    prog='zn_sub_thr',
+    description='zenoh-net throughput sub example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The subscriber path')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--samples', '-s', dest='samples',
+                    default=10,
+                    metavar='NUMBER',
+                    action='append',
+                    type=int,
+                    help='Number of throughput measurements.')
+parser.add_argument('--number', '-n', dest='number',
+                    default=50000,
+                    metavar='NUMBER',
+                    action='append',
+                    type=int,
+                    help='Number of messages in each throughput measurements.')
 
 args = parser.parse_args()
-
-locator = args.locator
-path = args.path
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
+m = args.samples
+n = args.number
 
 # zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-N = 100000
+
+def print_stats(start):
+    stop = datetime.datetime.now()
+    print("{:.6f} msgs/sec".format(n / (stop - start).total_seconds()))
+
 
 count = 0
 start = None
-stop = None
+nm = 0
 
 
-def print_stats(start, stop):
-    print("{:.6f} msgs/sec".format(N / (stop - start).total_seconds()))
-
-
-def listener(rname, data, info):
-    global count, start, stop
+def listener(sample):
+    global n, m, count, start, nm
     if count == 0:
         start = datetime.datetime.now()
         count += 1
-    elif count < N:
+    elif count < n:
         count += 1
     else:
-        stop = datetime.datetime.now()
-        print_stats(start, stop)
+        print_stats(start)
+        nm += 1
         count = 0
+        if nm >= m:
+            sys.exit(0)
 
 
-s = Session.open(locator)
-sub = s.declare_subscriber(path, SubscriberMode.push(), listener)
+# initiate logging
+zenoh.init_logger()
 
-time.sleep(60)
+session = zenoh.net.open(conf)
 
-s.undeclare_subscriber(sub)
-s.close()
+rid = session.declare_resource('/test/thr')
+
+sub_info = SubInfo(Reliability.Reliable, SubMode.Push)
+sub = session.declare_subscriber(rid, sub_info, listener)
+
+time.sleep(600)

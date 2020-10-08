@@ -13,48 +13,68 @@
 import sys
 import time
 import argparse
-from zenoh.net import Session, SubscriberMode
-
+import zenoh
+from zenoh.net import config, SubInfo, Reliability, SubMode
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='zn_sub',
-    description='An example illustrating zenoh subscribers')
-parser.add_argument('--selector', '-s', dest='selector',
-                    default='/zenoh/examples/**',
+    description='zenoh-net sub example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The selector specifying the subscription')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
-
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--selector', '-s', dest='selector',
+                    default='/demo/example/**',
+                    type=str,
+                    help='The selection of resources to subscribe.')
 
 args = parser.parse_args()
-
-locator = args.locator
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
 selector = args.selector
 
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
-def listener(rname, data, info):
-    print(">> [Subscription listener] Received ('{}': '{}') at {}"
-          .format(rname, data.decode("utf-8"), info.tstamp))
 
+def listener(sample):
+    time = '(not specified)' if sample.data_info is None or sample.data_info.timestamp is None else sample.data_info.timestamp.time
+    print(">> [Subscription listener] Received ('{}': '{}') published at {}"
+          .format(sample.res_name, sample.payload.decode("utf-8"), time))
+
+
+# initiate logging
+zenoh.init_logger()
 
 print("Openning session...")
-s = Session.open(locator)
+session = zenoh.net.open(conf)
 
 print("Declaring Subscriber on '{}'...".format(selector))
-sub = s.declare_subscriber(selector, SubscriberMode.push(), listener)
+sub_info = SubInfo(Reliability.Reliable, SubMode.Push)
 
-print('Press "q" at any time to terminate...')
+sub = session.declare_subscriber(selector, sub_info, listener)
+
+print("Press q to stop...")
 c = '\0'
 while c != 'q':
     c = sys.stdin.read(1)
 
-s.undeclare_subscriber(sub)
-s.close()
+sub.undeclare()
+session.close()

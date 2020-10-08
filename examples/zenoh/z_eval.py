@@ -11,76 +11,86 @@
 #   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 
 import sys
+import time
 import argparse
-import concurrent.futures
-from zenoh import Zenoh, Selector, Path, Workspace
-from zenoh import Change, ChangeKind, Encoding, Value
-
+import zenoh
+from zenoh import Zenoh
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='z_eval',
-    description='Shows how to use zenoh evaluated/computed resources')
-parser.add_argument('--path', '-p', dest='path',
-                    default='/zenoh/examples/python/eval',
+    description='zenoh eval example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='the path representing the  URI')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--path', '-p', dest='path',
+                    default='/demo/example/eval',
+                    type=str,
+                    help='The path the eval will respond for.')
 
 args = parser.parse_args()
-
+conf = { "mode": args.mode }
+if args.peer is not None:
+    conf["peer"] = ",".join(args.peer)
+if args.listener is not None:
+    conf["listener"] = ",".join(args.listener)
 path = args.path
-locator = args.locator
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-print('Login to Zenoh...')
-z = Zenoh.login(locator)
+# initiate logging
+zenoh.init_logger()
 
-# Note that we give a ThreadPool to the workspace here, for our eval_callback
-# below to be called in a separate thread rather that in Zenoh I/O thread.
-# Thus, the callback can perform some Zenoh operations (e.g.: get)
-w = z.workspace(executor=concurrent.futures.ThreadPoolExecutor())
+print("Openning session...")
+zenoh = Zenoh(conf)
+
+print("New workspace...")
+workspace = zenoh.workspace()
 
 
-def eval_callback(path, properties):
-    # In this Eval function, we choosed to get the name to be returned in the
-    # StringValue in 3 possible ways, depending the properties specified in the
-    # selector. For example, with the following selectors:
-    #   - '/demo/example/zenoh-python-eval' :
-    #         no properties are set, a default value is used for the name
-    #   - '/demo/example/zenoh-python-eval?(name=Bob)' :
-    #         'Bob' is used for the name
-    #   - '/demo/example/zenoh-python-eval?(name=/demo/example/name)' :
-    #         the Eval function does a GET on '/demo/example/name' and uses the
-    #         1st result for the name
-    print('>> Processing eval for path {} with properties: {}'
-          .format(path, properties))
-    # name = properties['name']
-    name = properties.get('name', 'Zenoh Python!')
+def eval_callback(get_request):
+    print(">> [Eval listener] received get with selector: {}".format(
+        get_request.selector))
 
+    # The returned Value is a StringValue with a 'name' part which is set in 3 possible ways,
+    # depending the properties specified in the selector. For example, with the
+    # following selectors:
+    # - "/zenoh/example/eval" : no properties are set, a default value is used for the name
+    # - "/zenoh/example/eval?(name=Bob)" : "Bob" is used for the name
+    # - "/zenoh/example/eval?(name=/zenoh/example/name)" : the Eval function does a GET
+    #      on "/zenoh/example/name" an uses the 1st result for the name
+    # properties.get('name', 'Zenoh Python!')
+    name = get_request.selector.properties.get('name', 'Python!')
     if name.startswith('/'):
         print('   >> Get name to use from Zenoh at path: {}'.format(name))
-        dataset = w.get(name)
+        dataset = workspace.get(name)
+        print('   >> get result: {}'.format(dataset))
         if len(dataset) > 0:
-            name = dataset[0].value
+            name = dataset[0].value.get_content()
 
-    print('   >> Returning string: "Eval from {}"'.format(name))
-    return Value('Eval from {}'.format(name), encoding=Encoding.STRING)
+    print('   >> Replying string: "Eval from {}"'.format(name))
+    get_request.reply(path, 'Eval from {}'.format(name))
 
 
-print('Register eval {}'.format(path))
-w.register_eval(path, eval_callback)
+print("Register eval for '{}'...".format(path))
+eval = workspace.register_eval(path, eval_callback)
 
-print('Enter \'q\' to quit...')
-while sys.stdin.read(1) != 'q':
-    pass
+print("Press q to stop...")
+c = '\0'
+while c != 'q':
+    c = sys.stdin.read(1)
 
-w.unregister_eval(path)
-z.logout()
+eval.close()
+zenoh.close()

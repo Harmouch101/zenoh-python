@@ -12,9 +12,13 @@
 ..   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 ..
 
-===================
+
 Zenoh API Reference
 ===================
+
+.. automodule:: zenoh
+    :members: init_logger
+
 
 Zenoh
 -----
@@ -26,29 +30,19 @@ Workspace
 .. autoclass:: zenoh.Workspace
     :members:
 
-Admin
------
-.. autoclass:: zenoh.Admin
+Subscriber
+----------
+.. autoclass:: zenoh.Subscriber
+    :members:
+
+Eval
+----
+.. autoclass:: zenoh.Eval
     :members:
 
 Value
 -----
 .. autoclass:: zenoh.Value
-    :members: get_value, get_encoding
-
-Encoding
---------
-.. autoclass:: zenoh.Encoding
-    :members:
-
-Change
-------
-.. autoclass:: zenoh.Change
-    :members:
-
-ChangeKind
-----------
-.. autoclass:: zenoh.ChangeKind
     :members:
 
 Data
@@ -56,8 +50,23 @@ Data
 .. autoclass:: zenoh.Data
     :members:
 
-Timestamp
----------
-.. autoclass:: zenoh.core.Timestamp
+Selector
+--------
+.. autoclass:: zenoh.Selector
     :members:
 
+ChangeKind
+----------
+.. autoclass:: zenoh.ChangeKind
+    :members:
+    :undoc-members:
+
+Change
+------
+.. autoclass:: zenoh.Change
+    :members:
+
+GetRequest
+----------
+.. autoclass:: zenoh.GetRequest
+    :members:

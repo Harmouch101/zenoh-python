@@ -14,28 +14,35 @@ import sys
 import time
 import datetime
 import argparse
-from zenoh import Zenoh, Selector, Path, Workspace, Encoding, Value
+import zenoh
+from zenoh import Zenoh
 
 # --- Command line argument parsing --- --- --- --- --- ---
-parser = argparse.ArgumentParser(prog='z_sub_thr',
-                                 description='The zenoh throughput subscriber')
-
-parser.add_argument('--path', '-p', dest='path',
-                    default='/zenoh/examples/throughput/data',
+parser = argparse.ArgumentParser(
+    prog='z_sub',
+    description='zenoh sub example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The subscriber path')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
 
 args = parser.parse_args()
-
-locator = args.locator
-path = args.path
+conf = { "mode": args.mode }
+if args.peer is not None:
+    conf["peer"] = ",".join(args.peer)
+if args.listener is not None:
+    conf["listener"] = ",".join(args.listener)
 
 # zenoh code  --- --- --- --- --- --- --- --- --- --- ---
 
@@ -65,15 +72,19 @@ def listener(changes):
         count = 0
 
 
-print('Login to Zenoh...')
-z = Zenoh.login(locator)
+# initiate logging
+zenoh.init_logger()
 
-w = z.workspace()
+print("New zenoh...")
+zenoh = Zenoh(conf)
 
-print("Subscribe on {}".format(path))
-subid = w.subscribe(path, listener)
+print("New workspace...")
+workspace = zenoh.workspace()
+
+print("Subscribe on {}".format('/test/thr'))
+sub = workspace.subscribe('/test/thr', listener)
 
 time.sleep(60)
 
-w.unsubscribe(subid)
-z.logout()
+sub.close()
+zenoh.close()

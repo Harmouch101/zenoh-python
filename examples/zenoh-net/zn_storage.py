@@ -13,59 +13,85 @@
 import sys
 import time
 import argparse
-from zenoh.net import Session, zn_rname_intersect
+import zenoh
+from zenoh.net import config, SubInfo, Reliability, SubMode, Sample, resource_name
+from zenoh.net.queryable import STORAGE
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='zn_storage',
-    description='Implements and register a zenoh storage')
-parser.add_argument('--selector', '-s', dest='selector',
-                    default='/zenoh/examples/**',
+    description='zenoh-net storage example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='the selector associated with this storage')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--selector', '-s', dest='selector',
+                    default='/demo/example/**',
+                    type=str,
+                    help='The selection of resources to subscribe.')
 
 args = parser.parse_args()
-
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
 selector = args.selector
-locator = args.locator
 
 # zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
+
 store = {}
 
 
-def listener(rname, data, info):
+def listener(sample):
     print(">> [Storage listener] Received ('{}': '{}')"
-          .format(rname, data.decode("utf-8")))
-    store[rname] = (data, info)
+          .format(sample.res_name, sample.payload.decode("utf-8")))
+    store[sample.res_name] = (sample.payload, sample.data_info)
 
 
-def query_handler(path_selector, content_selector, send_replies):
+def query_handler(query):
     print(">> [Query handler   ] Handling '{}?{}'"
-          .format(path_selector, content_selector))
+          .format(query.res_name, query.predicate))
     replies = []
-    for k, v in store.items():
-        if zn_rname_intersect(path_selector, k):
-            replies.append((k, v))
-    send_replies(replies)
+    for stored_name, (data, data_info) in store.items():
+        if resource_name.intersect(query.res_name, stored_name):
+            query.reply(Sample(stored_name, data, data_info))
 
+
+# initiate logging
+zenoh.init_logger()
 
 print("Openning session...")
-s = Session.open(locator)
+session = zenoh.net.open(conf)
 
-print("Declaring Storage on '{}'...".format(selector))
-sto = s.declare_storage(selector, listener, query_handler)
+sub_info = SubInfo(Reliability.Reliable, SubMode.Push)
 
-print('Press "q" at any time to terminate...')
+print("Declaring Subscriber on '{}'...".format(selector))
+sub = session.declare_subscriber(selector, sub_info, listener)
+
+print("Declaring Queryable on '{}'...".format(selector))
+queryable = session.declare_queryable(
+    selector, STORAGE, query_handler)
+
+print("Press q to stop...")
 c = '\0'
 while c != 'q':
     c = sys.stdin.read(1)
 
-s.undeclare_storage(sto)
-s.close()
+sub.undeclare()
+queryable.undeclare()
+session.close()

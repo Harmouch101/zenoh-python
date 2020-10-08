@@ -12,18 +12,40 @@
 ..   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 ..
 
-=======================
 Zenoh-net API Reference
 =======================
+
+.. automodule:: zenoh.net
+    :members: open, scout
+
+Hello
+-----
+.. autoclass:: zenoh.net.Hello
+    :members:
 
 Session
 -------
 .. autoclass:: zenoh.net.Session
     :members:
 
-SubscriberMode
---------------
-.. autoclass:: zenoh.net.SubscriberMode
+Subscriber
+----------
+.. autoclass:: zenoh.net.Subscriber
+    :members:
+
+ResKey
+------
+.. autoclass:: zenoh.net.ResKey
+    :members:
+
+PeerId
+------
+.. autoclass:: zenoh.net.PeerId
+    :members:
+
+Timestamp
+---------
+.. autoclass:: zenoh.net.Timestamp
     :members:
 
 DataInfo
@@ -31,12 +53,115 @@ DataInfo
 .. autoclass:: zenoh.net.DataInfo
     :members:
 
-QueryDest
----------
-.. autoclass:: zenoh.net.QueryDest
+Sample
+------
+.. autoclass:: zenoh.net.Sample
     :members:
 
-QueryReply
-----------
-.. autoclass:: zenoh.net.QueryReply
+Reliability
+-----------
+.. autoclass:: zenoh.net.Reliability
     :members:
+
+    .. autoattribute:: BestEffort
+            :annotation:
+    .. autoattribute:: Reliable
+            :annotation:
+
+SubMode
+-------
+.. autoclass:: zenoh.net.SubMode
+    :members:
+
+    .. autoattribute:: Push
+            :annotation:
+    .. autoattribute:: Pull
+            :annotation:
+
+Period
+------
+.. autoclass:: zenoh.net.Period
+    :members:
+
+SubInfo
+-------
+.. autoclass:: zenoh.net.SubInfo
+    :members:
+
+Publisher
+---------
+.. autoclass:: zenoh.net.Publisher
+    :members:
+
+Query
+-----
+.. autoclass:: zenoh.net.Query
+    :members:
+
+Queryable
+---------
+.. autoclass:: zenoh.net.Queryable
+    :members:
+
+Target
+------
+.. autoclass:: zenoh.net.Target
+    :members:
+
+QueryTarget
+-----------
+.. autoclass:: zenoh.net.QueryTarget
+    :members:
+
+QueryConsolidation
+------------------
+.. autoclass:: zenoh.net.QueryConsolidation
+    :members:
+
+    .. autoattribute:: None
+            :annotation:
+    .. autoattribute:: LastHop
+            :annotation:
+    .. autoattribute:: Incremental
+            :annotation:
+
+Reply
+-----
+.. autoclass:: zenoh.net.Reply
+    :members:
+
+module zenoh.net.config
+-----------------------
+.. automodule:: zenoh.net.config
+    :members:
+    :undoc-members:
+
+module zenoh.net.info
+---------------------
+.. automodule:: zenoh.net.info
+    :members:
+    :undoc-members:
+
+module zenoh.net.whatami
+------------------------
+.. automodule:: zenoh.net.whatami
+    :members:
+    :undoc-members:
+
+module zenoh.net.queryable
+--------------------------
+.. automodule:: zenoh.net.queryable
+    :members:
+    :undoc-members:
+
+module zenoh.net.resource_name
+------------------------------
+.. automodule:: zenoh.net.resource_name
+    :members:
+
+module zenoh.net.encoding
+-------------------------
+.. automodule:: zenoh.net.encoding
+    :members:
+    :undoc-members:
+

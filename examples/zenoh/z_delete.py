@@ -14,17 +14,12 @@ import sys
 import time
 import argparse
 import zenoh
-from zenoh import Zenoh, Value
-from zenoh.net import encoding
+from zenoh import Zenoh
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
-    prog='z_sub',
-    description='zenoh sub example')
-parser.add_argument('size',
-                    metavar='PAYLOAD_SIZE',
-                    type=int,
-                    help='Sets the size of the payload to put.')
+    prog='z_delete',
+    description='zenoh delete example')
 parser.add_argument('--mode', '-m', dest='mode',
                     default='peer',
                     choices=['peer', 'client'],
@@ -40,6 +35,10 @@ parser.add_argument('--listener', '-l', dest='listener',
                     action='append',
                     type=str,
                     help='Locators to listen on.')
+parser.add_argument('--path', '-p', dest='path',
+                    default='/demo/example/zenoh-python-put',
+                    type=str,
+                    help='The name of the resource to delete.')
 
 args = parser.parse_args()
 conf = { "mode": args.mode }
@@ -47,24 +46,20 @@ if args.peer is not None:
     conf["peer"] = ",".join(args.peer)
 if args.listener is not None:
     conf["listener"] = ",".join(args.listener)
-print(type(args.size))
-size = args.size
+path = args.path
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
-print("Running throughput test for payload of {} bytes".format(size))
-data = bytearray()
-for i in range(0, size):
-    data.append(i % 10)
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-v = Value.Raw(encoding.NONE, bytes(data))
+# initiate logging
+zenoh.init_logger()
 
-print("New zenoh...")
+print("Openning session...")
 zenoh = Zenoh(conf)
 
 print("New workspace...")
 workspace = zenoh.workspace()
 
+print("Delete Path '{}'...\n".format(path))
+workspace.delete(path)
 
-print('Press Ctrl-C to stop the publisher...')
-while True:
-    workspace.put('/test/thr', v)
+zenoh.close()

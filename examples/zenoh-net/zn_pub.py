@@ -14,17 +14,12 @@ import sys
 import time
 import argparse
 import zenoh
-from zenoh import Zenoh, Value
-from zenoh.net import encoding
+from zenoh.net import config
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
-    prog='z_sub',
-    description='zenoh sub example')
-parser.add_argument('size',
-                    metavar='PAYLOAD_SIZE',
-                    type=int,
-                    help='Sets the size of the payload to put.')
+    prog='zn_pub',
+    description='zenoh-net pub example')
 parser.add_argument('--mode', '-m', dest='mode',
                     default='peer',
                     choices=['peer', 'client'],
@@ -40,31 +35,44 @@ parser.add_argument('--listener', '-l', dest='listener',
                     action='append',
                     type=str,
                     help='Locators to listen on.')
+parser.add_argument('--path', '-p', dest='path',
+                    default='/demo/example/zenoh-python-pub',
+                    type=str,
+                    help='The name of the resource to publish.')
+parser.add_argument('--value', '-v', dest='value',
+                    default='Pub from Python!',
+                    type=str,
+                    help='The value of the resource to publish.')
 
 args = parser.parse_args()
-conf = { "mode": args.mode }
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
 if args.peer is not None:
-    conf["peer"] = ",".join(args.peer)
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
 if args.listener is not None:
-    conf["listener"] = ",".join(args.listener)
-print(type(args.size))
-size = args.size
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
+path = args.path
+value = args.value
 
-# zenoh code  --- --- --- --- --- --- --- --- --- --- ---
-print("Running throughput test for payload of {} bytes".format(size))
-data = bytearray()
-for i in range(0, size):
-    data.append(i % 10)
+# zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
-v = Value.Raw(encoding.NONE, bytes(data))
+# initiate logging
+zenoh.init_logger()
 
-print("New zenoh...")
-zenoh = Zenoh(conf)
+print("Openning session...")
+session = zenoh.net.open(conf)
 
-print("New workspace...")
-workspace = zenoh.workspace()
+print("Declaring Resource " + path)
+rid = session.declare_resource(path)
+print(" => RId {}".format(rid))
 
+print("Declaring Publisher on {}".format(rid))
+publisher = session.declare_publisher(rid)
 
-print('Press Ctrl-C to stop the publisher...')
-while True:
-    workspace.put('/test/thr', v)
+print("Writing Data ('{}': '{}')...".format(rid, value))
+session.write(rid, bytes(value, encoding='utf8'))
+
+publisher.undeclare()
+session.close()

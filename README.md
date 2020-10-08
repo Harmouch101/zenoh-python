@@ -9,9 +9,9 @@
 # Eclipse zenoh Python API
 
 [Eclipse zenoh](http://zenoh.io) is an extremely efficient and fault-tolerant [Named Data Networking](http://named-data.net) (NDN) protocol 
-that is able to scale down to extremely constrainded devices and networks. 
+that is able to scale down to extremely constrainded devices and networks.
 
-The Python API is for pure clients, in other terms does not support peer-to-peer communication, can be easily tested against a zenoh router running in a Docker container (see https://github.com/eclipse-zenoh/zenoh#how-to-test-it). 
+The Python API is for pure clients, in other terms does not support peer-to-peer communication, can be easily tested against a zenoh router running in a Docker container (see https://github.com/eclipse-zenoh/zenoh#how-to-test-it).
 
 -------------------------------
 ## How to install it
@@ -24,33 +24,40 @@ pip install eclipse-zenoh
 
 ### Supported Python versions and platforms
 
-zenoh-python has been tested with Python 3.5, 3.6, 3.7 and 3.8. 
+zenoh-python has been tested with Python 3.5, 3.6, 3.7 and 3.8.
 
-It relies on the [zenoh-c](https://github.com/eclipse-zenoh/zenoh-c) API which is currently supported on the following platforms:
+It relies on the [zenoh](https://github.com/eclipse-zenoh/zenoh/tree/master/zenoh) Rust API which require the full `std` library. See the list Rust supported platforms here: https://doc.rust-lang.org/nightly/rustc/platform-support.html .
+
+Currently only the following platforms have been tested:
  * Linux
  * MacOS X
 
-Notice that the Python wheels available on [Pypi.org](https://pypi.org/project/zenoh/) are pre-compiled for:
- * All MacOS X >= 10.9
- * Most of the 32-bits Linux distriutions thanks to manylinux2010_i686
- * Most of the 64-bits Linux distriutions thanks to manylinux2010_x86_64
-
-On other Linux architectures such as Raspberry, the `pip` tool will be able to download the sources distribution and to compile it.
 
 -------------------------------
-## How to build it 
+## How to build it
 
-The zenoh-python repository uses the [zenoh-c](https://github.com/eclipse-zenoh/zenoh-c) repository as a sub-module. Thus, be sure to also clone this submodule.  
-Also make sure to have [cmake >= 3.0](https://cmake.org) available on your host.
+Requirements:
+ * Python >= 3.5
+ * A virtual environement such as [venv](https://docs.python.org/3/library/venv.html), [miniconda](https://docs.conda.io/en/latest/miniconda.html) or [Conda](https://docs.conda.io/projects/conda/en/latest/)
+ * [Rust and Cargo](https://doc.rust-lang.org/cargo/getting-started/installation.html).
+   Then install the __*nighlty*__ toolchain running:
+   ```bash
+   rustup toolchain install nightly
+   ```
+ * [maturin](https://github.com/PyO3/maturin). Install it with:
+   ```bash
+   pip install maturin
+   ```
 
-For convenience, a top-level Makefile is available. Just do the following to build and install:
+Steps:
+ * Make sure your shell is running in a Python virtual environment.
+ * Build zenoh-python using **maturin**
+   ```bash
+   cd zenoh-python
+   maturin develop --release
+   ```
 
-  ```bash
-  $ cd /path/to/zenoh-python
-  $ make
-  $ make install # on linux use **sudo**
-  ```
-
+Maturin will automatically build the zenoh Rust API, as well as the zenoh-python API and install it in your Python virtual environement.
 
 -------------------------------
 ## Running the Examples
@@ -58,4 +65,3 @@ For convenience, a top-level Makefile is available. Just do the following to bui
 The simplest way to run some of the example is to get a Docker image of the **zenoh** network router (see https://github.com/eclipse-zenoh/zenoh#how-to-test-it) and then to run the examples on your machine.
 
 Then, run the zenoh-python examples following the instructions in [examples/zenoh/README.md](https://github.com/eclipse-zenoh/zenoh-python/blob/master/examples/zenoh/README.md)
-

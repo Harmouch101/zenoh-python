@@ -13,59 +13,63 @@
 import sys
 import time
 import argparse
-from zenoh.net import (
-    Session, QueryDest,
-    ZN_STORAGE_DATA, ZN_STORAGE_FINAL,
-    ZN_EVAL_DATA, ZN_EVAL_FINAL
-)
+import zenoh
+from zenoh.net import config, QueryTarget
+from zenoh.net.queryable import ALL_KINDS
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='zn_query',
-    description='Issues a query for a selector specified by the command-line')
-
-parser.add_argument('--selector', '-s', dest='selector',
-                    default='/zenoh/examples/**',
+    description='zenoh-net query example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='The selector to be used for issuing the query')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
-
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--selector', '-s', dest='selector',
+                    default='/demo/example/**',
+                    type=str,
+                    help='The selection of resources to query.')
 
 args = parser.parse_args()
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
 selector = args.selector
-locator = args.locator
-
 
 # zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
-def reply_handler(reply):
-    if reply.kind == ZN_STORAGE_DATA:
-        print(">> [Reply handler] received -Storage Data- ('{}': '{}')"
-              .format(reply.rname, reply.data.decode("utf-8")))
-    elif reply.kind == ZN_EVAL_DATA:
-        print(">> [Reply handler] received -Eval Data-    ('{}': '{}')"
-              .format(reply.rname, reply.data.decode("utf-8")))
-    elif reply.kind == ZN_STORAGE_FINAL:
-        print(">> [Reply handler] received -Storage Final-")
-    elif reply.kind == ZN_EVAL_FINAL:
-        print(">> [Reply handler] received -Eval Final-")
-    else:
-        print(">> [Reply handler] received -Reply Final-")
 
+
+def query_callback(reply):
+    time = '(not specified)' if reply.data.data_info is None else reply.data.data_info.timestamp.time
+    print(">> [Reply handler] received ('{}': '{}') published at {}"
+          .format(reply.data.res_name, reply.data.payload.decode("utf-8"), time))
+
+
+# initiate logging
+zenoh.init_logger()
 
 print("Openning session...")
-s = Session.open(locator)
+session = zenoh.net.open(conf)
 
-print("Sending query '{}'...".format(selector))
-s.query(selector, "", reply_handler,
-        dest_storages=QueryDest(QueryDest.ZN_ALL),
-        dest_evals=QueryDest(QueryDest.ZN_ALL))
+print("Sending Query '{}'...".format(selector))
+session.query(selector, '', query_callback)
 
 time.sleep(1)
 
-s.close()
+session.close()

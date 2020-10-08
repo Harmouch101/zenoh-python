@@ -13,49 +13,73 @@
 import sys
 import time
 import argparse
-from zenoh.net import Session, DataInfo, ZN_PUT
+import zenoh
+from zenoh.net import config, Sample
+from zenoh.net.queryable import EVAL
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='zn_eval',
-    description='Shows how to use zenoh-net evaluated/computed resources')
-parser.add_argument('--path', '-p', dest='path',
-                    default='/zenoh/examples/python/eval',
+    description='zenoh-net eval example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
                     type=str,
-                    help='the path representing the  URI')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
+parser.add_argument('--path', '-p', dest='path',
+                    default='/demo/example/zenoh-python-eval',
+                    type=str,
+                    help='The name of the resource to evaluate.')
+parser.add_argument('--value', '-v', dest='value',
+                    default='Eval from Python!',
+                    type=str,
+                    help='The value to reply to queries.')
 
 args = parser.parse_args()
-
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
 path = args.path
-locator = args.locator
+value = args.value
 
 # zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
 
-def query_handler(path_selector, content_selector, send_replies):
-    print(">> [Query handler] Handling '{}?{}'"
-          .format(path_selector, content_selector))
-    k, v = path, "Eval from Python!".encode()
-    send_replies([(k, (v, DataInfo(kind=ZN_PUT)))])
+def eval_callback(query):
+    print(">> [Query handler] Handling '{}{}'".format(
+        query.res_name, query.predicate))
+    query.reply(Sample(res_name=path, payload=value.encode()))
 
 
-print("Openning zenoh session...")
-s = Session.open(locator)
+# initiate logging
+zenoh.init_logger()
 
-print("Declaring Eval on '{}'...".format(path))
-e = s.declare_eval(path, query_handler)
+print("Openning session...")
+session = zenoh.net.open(conf)
 
-print('Press "q" at any time to terminate...')
+print("Declaring Queryable on '{}'...".format(path))
+queryable = session.declare_queryable(
+    path, EVAL, eval_callback)
+
+print("Press q to stop...")
 c = '\0'
 while c != 'q':
     c = sys.stdin.read(1)
 
-s.undeclare_eval(e)
-s.close()
+queryable.undeclare()
+session.close()

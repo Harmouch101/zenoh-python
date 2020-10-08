@@ -10,13 +10,17 @@
 # Contributors:
 #   ADLINK zenoh team, <zenoh@adlink-labs.tech>
 
-from .zenoh import Zenoh
-from .workspace import Workspace
-from .admin import Admin
-from .encoding import *
-from . import exceptions
-from .selector import Selector
-from .value import Value
-from .change import Change, ChangeKind
-from .data import Data
-from .path import Path
+import sys
+import time
+import argparse
+import zenoh
+from zenoh.net import whatami
+
+# initiate logging
+zenoh.init_logger()
+
+print("Scouting...")
+hellos = zenoh.net.scout(whatami.PEER | whatami.ROUTER, zenoh.net.config.default(), 1.0)
+
+for hello in hellos:
+    print(hello)

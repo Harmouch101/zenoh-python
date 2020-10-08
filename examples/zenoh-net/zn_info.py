@@ -12,42 +12,53 @@
 
 import sys
 import time
-import binascii
 import argparse
-from zenoh.net import (
-    Session,
-    ZN_USER_KEY, ZN_PASSWD_KEY,
-    ZN_INFO_PEER_KEY, ZN_INFO_PID_KEY, ZN_INFO_PEER_PID_KEY
-)
+import zenoh
+from zenoh.net import config
 
 # --- Command line argument parsing --- --- --- --- --- ---
 parser = argparse.ArgumentParser(
     prog='zn_info',
-    description='Shows how to retrieve peers information')
-
-parser.add_argument(
-    '--locator', '-l', dest='locator',
-    default=None,
-    type=str,
-    help='The locator to be used to boostrap the zenoh session.'
-         ' By default dynamic discovery is used')
+    description='zenoh-net info example')
+parser.add_argument('--mode', '-m', dest='mode',
+                    default='peer',
+                    choices=['peer', 'client'],
+                    type=str,
+                    help='The zenoh session mode.')
+parser.add_argument('--peer', '-e', dest='peer',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Peer locators used to initiate the zenoh session.')
+parser.add_argument('--listener', '-l', dest='listener',
+                    metavar='LOCATOR',
+                    action='append',
+                    type=str,
+                    help='Locators to listen on.')
 
 args = parser.parse_args()
-
-locator = args.locator
+conf = []
+conf.append((config.ZN_MODE_KEY, args.mode.encode('utf-8')))
+if args.peer is not None:
+    for peer in args.peer:
+        conf.append((config.ZN_PEER_KEY, peer.encode('utf-8')))
+if args.listener is not None:
+    for listener in args.listener:
+        conf.append((config.ZN_LISTENER_KEY, listener.encode('utf-8')))
 
 # zenoh-net code  --- --- --- --- --- --- --- --- --- --- ---
 
+# initiate logging
+zenoh.init_logger()
+
+conf.append((config.ZN_USER_KEY, b"user"))
+conf.append((config.ZN_PASSWORD_KEY, b"password"))
+
 print("Openning session...")
-s = Session.open(locator, {ZN_USER_KEY: "user".encode(),
-                 ZN_PASSWD_KEY: "password".encode()})
+session = zenoh.net.open(conf)
 
-info = s.info()
-peer = info[ZN_INFO_PEER_KEY]
-pid = info[ZN_INFO_PID_KEY]
-peer_pid = info[ZN_INFO_PEER_PID_KEY]
-print("LOCATOR :  {}".format(peer.decode("utf-8")))
-print("PID :      {}".format(binascii.hexlify(pid).decode("ascii")))
-print("PEER PID : {}".format(binascii.hexlify(peer_pid).decode("ascii")))
+info = session.info()
+for key, value in info:
+    print("{} : {}".format(zenoh.net.info.key_to_string(key), value.hex().upper()))
 
-s.close()
+session.close()
